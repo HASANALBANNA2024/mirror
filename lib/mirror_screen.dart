@@ -1,10 +1,11 @@
-import 'dart:io'; // এটি অবশ্যই যোগ করবেন File ব্যবহারের জন্য
+import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'mirror_settings_panel.dart';
 import 'mirror_frame_widgets.dart';
 import 'mirror_gallery_service.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // ডাটা সেভ করার জন্য
 import 'mirror_widgets.dart';
 
 class MirrorScreen extends StatefulWidget {
@@ -18,6 +19,9 @@ class _MirrorScreenState extends State<MirrorScreen> {
   CameraController? _controller;
   Future<void>? _initializeControllerFuture;
 
+  // জুম সিঙ্ক করার জন্য কন্ট্রোলার (UI পরিবর্তন করবে না)
+  final TransformationController _zoomController = TransformationController();
+
   double _zoomLevel = 1.0;
   bool _isLightOn = false;
   bool _isFrozen = false;
@@ -25,20 +29,15 @@ class _MirrorScreenState extends State<MirrorScreen> {
   bool _showGrid = true;
   bool _isFullscreen = false;
 
-
-  // সেটিংস ভেরিয়েবল
   bool _isSettingsOpen = false;
   bool _isGalleryOpen = false;
   String _activeMode = "HD VIEW";
 
-  // ফাংশনাল লজিকের জন্য ভেরিয়েবল
   Color _overlayColor = Colors.transparent;
   double _exposureLevel = 0.0;
   int _timerValue = 0;
   int _currentCountdown = 0;
 
-
-  // --- আপনার জন্য নতুন লিস্ট (গ্যালারি ইমেজ সেভ করার জন্য) ---
   List<String> _capturedImages = [];
   List<String> _selectedImages = [];
 
@@ -46,6 +45,22 @@ class _MirrorScreenState extends State<MirrorScreen> {
   void initState() {
     super.initState();
     _initCamera();
+    _loadImagesFromDisk(); // অ্যাপ খুললে পুরনো ছবি লোড হবে
+  }
+
+  // ১. ইমেজ লিস্ট ফোনে সেভ করার লজিক
+  Future<void> _saveImagesToDisk() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('captured_images', _capturedImages);
+  }
+
+  // ২. ফোন থেকে ইমেজ লিস্ট লোড করার লজিক
+  Future<void> _loadImagesFromDisk() async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String>? savedImages = prefs.getStringList('captured_images');
+    if (savedImages != null) {
+      setState(() => _capturedImages = savedImages);
+    }
   }
 
   Future<void> _initCamera() async {
@@ -64,15 +79,6 @@ class _MirrorScreenState extends State<MirrorScreen> {
       _initializeControllerFuture = _controller!.initialize();
       await _initializeControllerFuture;
 
-      if (_controller!.value.isInitialized) {
-        try {
-          await _controller!.setFocusMode(FocusMode.auto);
-          await _controller!.setExposureMode(ExposureMode.auto);
-        } catch (e) {
-          debugPrint("Focus/Exposure error: $e");
-        }
-      }
-
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint("Camera Error: $e");
@@ -82,6 +88,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
   @override
   void dispose() {
     _controller?.dispose();
+    _zoomController.dispose();
     super.dispose();
   }
 
@@ -121,47 +128,44 @@ class _MirrorScreenState extends State<MirrorScreen> {
     }
   }
 
-  // --- ক্যাপচার (মাঝখানের বাটন) লজিক আপডেট ---
   void _onCaptureTap() async {
     try {
       if (_controller == null || !_controller!.value.isInitialized) return;
 
-      // ১. যদি টাইমার ভ্যালু ০ এর বেশি হয় (৩ বা ৫ সেকেন্ড)
       if (_timerValue > 0) {
         for (int i = _timerValue; i > 0; i--) {
           if (!mounted) return;
-
-          setState(() {
-            _currentCountdown = i; // স্ক্রিনের মাঝখানে দেখানোর জন্য স্টেট আপডেট
-          });
-
-          // ১ সেকেন্ড অপেক্ষা করবে
+          setState(() => _currentCountdown = i);
           await Future.delayed(const Duration(seconds: 1));
         }
-
-        // টাইমার শেষ হলে ০ করে দিবে যাতে স্ক্রিন থেকে সংখ্যাটি চলে যায়
-        setState(() {
-          _currentCountdown = 0;
-        });
+        setState(() => _currentCountdown = 0);
       }
 
-      // ২. ইমেজ সেভ করা এবং পাথ নেয়া
       String? path = await MirrorGalleryService.saveSnapshot(context, _controller);
 
       if (path != null) {
-        setState(() {
-          _capturedImages.add(path); // গ্যালারি লিস্ট আপডেট হবে
-        });
+        setState(() => _capturedImages.add(path));
+        await _saveImagesToDisk(); // ছবি তোলার পর লিস্ট সেভ
       }
 
     } catch (e) {
       debugPrint("Capture Error: $e");
-      setState(() => _currentCountdown = 0); // এরর হলেও টাইমার রিসেট
+      setState(() => _currentCountdown = 0);
     }
   }
 
   void _onMirrorTap() {
-    setState(() => _showHandIcon = true);
+    setState(() {
+      // ট্যাপ করলে জুম লজিক
+      if (_zoomLevel < 5.0) {
+        _zoomLevel += 1.0;
+      } else {
+        _zoomLevel = 1.0;
+      }
+      _zoomController.value = Matrix4.identity()..scale(_zoomLevel);
+      _controller?.setZoomLevel(_zoomLevel);
+      _showHandIcon = true;
+    });
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) setState(() => _showHandIcon = false);
     });
@@ -218,29 +222,37 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 ),
                 child: Stack(
                   children: [
-                    _buildMirrorFrame(),
-                    // timer count
+                    // ২ আঙুলে জুম লজিক যা UI এর ক্ষতি করবে না
+                    InteractiveViewer(
+                      transformationController: _zoomController,
+                      minScale: 1.0,
+                      maxScale: 5.0,
+                      onInteractionUpdate: (details) {
+                        if (details.scale != 1.0) {
+                          setState(() {
+                            _zoomLevel = _zoomController.value.getMaxScaleOnAxis().clamp(1.0, 5.0);
+                            _controller?.setZoomLevel(_zoomLevel);
+                          });
+                        }
+                      },
+                      child: _buildMirrorFrame(),
+                    ),
+
                     if (_currentCountdown > 0)
-                      Center( // এটি হরাইজন্টাল এবং ভার্টিক্যাল সেন্টার নিশ্চিত করে
+                      Center(
                         child: IgnorePointer(
                           child: Text(
                             "$_currentCountdown",
                             style: TextStyle(
-                              fontSize: 120, // আপনার চাহিদা মতো বড় সাইজ
+                              fontSize: 120,
                               fontWeight: FontWeight.w900,
                               color: Colors.white.withOpacity(0.9),
-                              shadows: const [
-                                Shadow(
-                                  blurRadius: 15,
-                                  color: Colors.black54,
-                                  offset: Offset(2, 4),
-                                ),
-                              ],
+                              shadows: const [Shadow(blurRadius: 15, color: Colors.black54, offset: Offset(2, 4))],
                             ),
                           ),
                         ),
                       ),
-                    // timer count end
+
                     if (_overlayColor != Colors.transparent)
                       IgnorePointer(
                         child: AnimatedContainer(
@@ -256,16 +268,15 @@ class _MirrorScreenState extends State<MirrorScreen> {
             if (_isGalleryOpen)
               MirrorGalleryService.buildInAppGallery(
                 imagePaths: _capturedImages,
-                selectedPaths: _selectedImages, // এটি আপনার নতুন লিস্ট
+                selectedPaths: _selectedImages,
                 onClose: () {
                   setState(() {
                     _isGalleryOpen = false;
-                    _selectedImages.clear(); // বন্ধ করলে সিলেকশন মুছে যাবে
+                    _selectedImages.clear();
                   });
                 },
                 onLongPress: (path) {
                   setState(() {
-                    // লং প্রেস করলে সিলেক্ট হবে
                     if (_selectedImages.contains(path)) {
                       _selectedImages.remove(path);
                     } else {
@@ -282,20 +293,16 @@ class _MirrorScreenState extends State<MirrorScreen> {
                         _selectedImages.add(path);
                       }
                     });
-                  } else {
-                    // এখানে চাইলে সিঙ্গেল ট্যাপে ছবি বড় করে দেখার লজিক দিতে পারেন
-                    debugPrint("Single tap on: $path");
                   }
                 },
                 onDeleteAll: () {
                   setState(() {
-                    // সিলেক্ট করা সব ছবি একসাথে ডিলিট
                     _capturedImages.removeWhere((item) => _selectedImages.contains(item));
                     _selectedImages.clear();
                   });
+                  _saveImagesToDisk(); // ডিলিট করার পর স্টোরেজ আপডেট
                 },
                 onShareAll: () async {
-                  // সিলেক্ট করা সব ছবি একসাথে শেয়ার
                   if (_selectedImages.isNotEmpty) {
                     final files = _selectedImages.map((path) => XFile(path)).toList();
                     await Share.shareXFiles(files);
@@ -351,6 +358,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 onChanged: (v) {
                   setState(() {
                     _zoomLevel = v;
+                    _zoomController.value = Matrix4.identity()..scale(_zoomLevel);
                     _controller?.setZoomLevel(v);
                   });
                 },
@@ -395,11 +403,10 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
   Widget _buildBottomSystemBar() {
     return SizedBox(
-      height: 45, // একটু হাইট বাড়ানো হয়েছে থাম্বনেইল দেখানোর জন্য
+      height: 45,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // বাম পাশের গ্যালারি আইকন (এখানে শেষ তোলা ছবি দেখাবে)
           GestureDetector(
             onTap: () => setState(() => _isGalleryOpen = !_isGalleryOpen),
             child: Container(
@@ -422,11 +429,10 @@ class _MirrorScreenState extends State<MirrorScreen> {
             ),
           ),
 
-          // ২. মাঝখানের ক্যামেরা বাটন (ক্যাপচার)
           GestureDetector(
             onTap: _onCaptureTap,
             child: Container(
-              width: 35, // আইকনটি সুন্দরভাবে দেখানোর জন্য সাইজ একটু বাড়ানো হয়েছে
+              width: 35,
               height: 35,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -442,15 +448,14 @@ class _MirrorScreenState extends State<MirrorScreen> {
               ),
               child: const Center(
                 child: Icon(
-                  Icons.camera_alt, // ক্যামেরা আইকন যোগ করা হয়েছে
-                  color: Color(0xFF121212), // ব্যাকগ্রাউন্ডের সাথে ম্যাচ করে ডার্ক কালার
+                  Icons.camera_alt,
+                  color: Color(0xFF121212),
                   size: 30,
                 ),
               ),
             ),
           ),
 
-          // setting icon
           GestureDetector(
             onTap: () {
               setState(() {

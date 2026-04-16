@@ -1,19 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:gal/gal.dart'; // ছবি সেভ করার জন্য
+import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
 
 class MirrorGalleryService {
 
-  // ১. ইমেজ সেভ করার ফাংশন (এটি না থাকায় আপনার মেইন ফাইলে লাল দাগ আসছিল)
   static Future<String?> saveSnapshot(BuildContext context, dynamic controller) async {
     try {
       if (controller == null || !controller.value.isInitialized) return null;
-
-      // ছবি তুলবে
       final image = await controller.takePicture();
-
-      // ফোনের গ্যালারিতে সেভ করবে
       await Gal.putImage(image.path);
 
       if (context.mounted) {
@@ -25,14 +20,13 @@ class MirrorGalleryService {
           ),
         );
       }
-      return image.path; // ছবির পাথ রিটার্ন করবে যাতে লিস্টে অ্যাড করা যায়
+      return image.path;
     } catch (e) {
       debugPrint("Save Error: $e");
       return null;
     }
   }
 
-  // ২. ইন-অ্যাপ গ্যালারি উইজেট (মাল্টি-সিল্যাক্ট, শেয়ার এবং ডিলিট সহ)
   static Widget buildInAppGallery({
     required List<String> imagePaths,
     required List<String> selectedPaths,
@@ -43,11 +37,10 @@ class MirrorGalleryService {
     required VoidCallback onShareAll,
   }) {
     return Container(
-      height: 180, // আপনার চাহিদা মতো হাইট সেট করা হয়েছে
+      height: 180,
       color: Colors.black.withOpacity(0.95),
       child: Column(
         children: [
-          // টুলবার সেকশন
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
             child: Row(
@@ -79,25 +72,40 @@ class MirrorGalleryService {
             ),
           ),
 
-          // ইমেজ গ্রিড/লিস্ট
           Expanded(
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: imagePaths.length,
               itemBuilder: (context, index) {
-                // নতুন ছবিগুলো আগে দেখানোর জন্য reversed ব্যবহার করা হয়েছে
-                String path = imagePaths.reversed.toList()[index];
+                // নতুন ছবিগুলো আগে দেখানোর জন্য reversed লিস্ট
+                List<String> reversedList = imagePaths.reversed.toList();
+                String path = reversedList[index];
                 bool isSelected = selectedPaths.contains(path);
 
                 return GestureDetector(
                   onLongPress: () => onLongPress(path),
-                  onTap: () => onTap(path),
+                  onTap: () {
+                    if (selectedPaths.isNotEmpty) {
+                      onTap(path); // সিলেকশন মোড চালু থাকলে সিলেক্ট করবে
+                    } else {
+                      // সিলেকশন না থাকলে ফুল স্ক্রিন ভিউয়ার ওপেন করবে
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FullScreenImageViewer(
+                            imagePaths: reversedList,
+                            initialIndex: index,
+                          ),
+                        ),
+                      );
+                    }
+                  },
                   child: Stack(
                     children: [
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        width: 100, // বক্সের সাইজ মিডিয়াম রাখা হয়েছে
+                        width: 100,
                         margin: const EdgeInsets.only(right: 10, bottom: 15),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
@@ -128,6 +136,52 @@ class MirrorGalleryService {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// --- ফুল স্ক্রিন ইমেজ ভিউয়ার ক্লাস (Swipeable) ---
+class FullScreenImageViewer extends StatelessWidget {
+  final List<String> imagePaths;
+  final int initialIndex;
+
+  const FullScreenImageViewer({
+    super.key,
+    required this.imagePaths,
+    required this.initialIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final PageController controller = PageController(initialPage: initialIndex);
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: PageView.builder(
+        controller: controller,
+        itemCount: imagePaths.length,
+        itemBuilder: (context, index) {
+          return Center(
+            child: InteractiveViewer(
+              panEnabled: true,
+              minScale: 1.0,
+              maxScale: 4.0,
+              child: Image.file(
+                File(imagePaths[index]),
+                fit: BoxFit.contain, // ছবি অনুযায়ী পুরো স্ক্রিন নিবে
+              ),
+            ),
+          );
+        },
       ),
     );
   }
