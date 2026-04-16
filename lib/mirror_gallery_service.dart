@@ -1,108 +1,76 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
 
 class MirrorGalleryService {
 
-  // ১. ছবি সেভ করার ফাংশন (Freeze থাকা অবস্থায় কল হবে)
-  static Future<void> saveSnapshot(BuildContext context, dynamic controller) async {
+  // ১. ইমেজ সেভ করার ফাংশন (যা আপনার এররটি ফিক্স করবে)
+  static Future<String?> saveSnapshot(BuildContext context, dynamic controller) async {
     try {
-      if (controller == null || !controller.value.isInitialized) {
-        debugPrint("Camera controller not ready");
-        return;
-      }
+      if (controller == null || !controller.value.isInitialized) return null;
 
-      // ছবি তুলবে
       final image = await controller.takePicture();
-
-      // gal প্যাকেজ দিয়ে গ্যালারিতে সেভ করবে
-      await Gal.putImage(image.path);
+      await Gal.putImage(image.path); // ফোনের গ্যালারিতে সেভ হবে
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 10),
-                Text("Saved to Gallery!"),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            content: Text("Captured & Saved!"),
+            duration: Duration(milliseconds: 700),
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
+      return image.path; // ছবির পাথ রিটার্ন করবে যাতে লিস্টে অ্যাড করা যায়
     } catch (e) {
-      debugPrint("Error saving image: $e");
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to save image"), backgroundColor: Colors.redAccent),
-        );
-      }
+      debugPrint("Save Error: $e");
+      return null;
     }
   }
 
-  // ২. ইন-অ্যাপ গ্যালারি (Horizontal/Side Scroll)
-  static Widget buildInAppGallery({required VoidCallback onClose}) {
+  // ২. ইন-অ্যাপ গ্যালারি (বক্সের উচ্চতা ১০০-এর নিচে করা হয়েছে)
+  static Widget buildInAppGallery({
+    required List<String> imagePaths,
+    required VoidCallback onClose
+  }) {
     return Container(
-      height: 200, // গ্যালারির উচ্চতা নির্ধারণ
-      color: const Color(0xFF0D0D0D), // ডার্ক থিম
+      height: 100, // উচ্চতা ১০০ করে দেওয়া হয়েছে আপনার রিকোয়েস্ট অনুযায়ী
+      color: Colors.black.withOpacity(0.9),
       child: Column(
         children: [
-          // হেডার: টাইটেল এবং ক্লোজ বাটন
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "SAVED LOOKS",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                    fontSize: 11,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: onClose,
-                  child: const Icon(Icons.close, color: Colors.white54, size: 20),
-                ),
-              ],
+          // ছোট ক্লোজ বাটন বার
+          GestureDetector(
+            onTap: onClose,
+            child: Container(
+              width: double.infinity,
+              color: Colors.white.withOpacity(0.05),
+              child: const Icon(Icons.keyboard_arrow_down, color: Colors.white38, size: 16),
             ),
           ),
 
-          // সাইড স্ক্রোলিং গ্রিড (একসাথে ৩টি ছবি দেখাবে)
           Expanded(
-            child: GridView.builder(
-              scrollDirection: Axis.horizontal, // পাশাপাশি স্ক্রোল হবে
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 1, // এক সারিতে ১টি (যেহেতু হরিজন্টাল, তাই এটি উচ্চতা নিয়ন্ত্রণ করে)
-                mainAxisSpacing: 12, // ছবির মাঝের গ্যাপ
-                childAspectRatio: 1.3, // ছবির উইডথ নিয়ন্ত্রণ করবে
-              ),
-              itemCount: 10, // এখানে আপনার ইমেজের লিস্ট বসবে
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              itemCount: imagePaths.length,
               itemBuilder: (context, index) {
+                // নতুন ছবিগুলো আগে দেখাবে
+                String path = imagePaths.reversed.toList()[index];
                 return Container(
-                  width: 120, // প্রতি ছবির চওড়া
+                  width: 60, // উইডথ আরও কমানো হয়েছে
+                  margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(5),
                     border: Border.all(color: Colors.white10),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: const Center(
-                      child: Icon(Icons.photo_library_outlined, color: Colors.white12, size: 30),
-                    ),
+                    borderRadius: BorderRadius.circular(5),
+                    child: Image.file(File(path), fit: BoxFit.cover),
                   ),
                 );
               },
             ),
           ),
-          const SizedBox(height: 10),
         ],
       ),
     );

@@ -1,3 +1,4 @@
+import 'dart:io'; // এটি অবশ্যই যোগ করবেন File ব্যবহারের জন্য
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'mirror_settings_panel.dart';
@@ -32,6 +33,9 @@ class _MirrorScreenState extends State<MirrorScreen> {
   Color _overlayColor = Colors.transparent;
   double _exposureLevel = 0.0;
   int _timerValue = 0;
+
+  // --- আপনার জন্য নতুন লিস্ট (গ্যালারি ইমেজ সেভ করার জন্য) ---
+  List<String> _capturedImages = [];
 
   @override
   void initState() {
@@ -76,23 +80,20 @@ class _MirrorScreenState extends State<MirrorScreen> {
     super.dispose();
   }
 
-  // --- মোড হ্যান্ডেল করার ফাংশন ---
   void _handleModeChange(String newMode) {
     setState(() {
       _activeMode = newMode;
-
-      // ডিফল্ট ভ্যালু রিসেট
       _overlayColor = Colors.transparent;
       _exposureLevel = 0.0;
       _timerValue = 0;
 
       switch (newMode) {
         case "WARM LIGHT":
-          _overlayColor = Colors.orange.withOpacity(0.12); // হালকা সোনালি আভা
+          _overlayColor = Colors.orange.withOpacity(0.12);
           _exposureLevel = 0.3;
           break;
         case "COLD LIGHT":
-          _overlayColor = Colors.blue.withOpacity(0.08); // হালকা নীলচে আভা
+          _overlayColor = Colors.blue.withOpacity(0.08);
           _exposureLevel = 0.2;
           break;
         case "3S TIMER":
@@ -102,7 +103,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
           _timerValue = 5;
           break;
         case "LOW LIGHT":
-          _exposureLevel = 1.2; // অন্ধকার মোডে এক্সপোজার বাড়ানো
+          _exposureLevel = 1.2;
           break;
         case "HD VIEW":
           _exposureLevel = 0.0;
@@ -110,18 +111,16 @@ class _MirrorScreenState extends State<MirrorScreen> {
       }
     });
 
-    // ক্যামেরা কন্ট্রোলারে এক্সপোজার সরাসরি আপডেট
     if (_controller != null && _controller!.value.isInitialized) {
       _controller!.setExposureOffset(_exposureLevel);
     }
   }
 
-  // --- ক্যাপচার (মাঝখানের বাটন) লজিক ---
+  // --- ক্যাপচার (মাঝখানের বাটন) লজিক আপডেট ---
   void _onCaptureTap() async {
     try {
       if (_controller == null || !_controller!.value.isInitialized) return;
 
-      // ১. যদি টাইমার সেট করা থাকে (৩ বা ৫ সেকেন্ড)
       if (_timerValue > 0) {
         for (int i = _timerValue; i > 0; i--) {
           if (!mounted) return;
@@ -139,12 +138,14 @@ class _MirrorScreenState extends State<MirrorScreen> {
         }
       }
 
-      // ২. টাইমার শেষ হওয়ার পর অথবা টাইমার না থাকলে (০ হলে) সরাসরি ছবি তুলবে
-      // MirrorGalleryService থেকে সরাসরি ছবি সেভ করার ফাংশন কল হবে
-      await MirrorGalleryService.saveSnapshot(context, _controller);
+      // ইমেজ সেভ করা এবং পাথ নেয়া (এটি আপনার এরর ফিক্স করবে)
+      String? path = await MirrorGalleryService.saveSnapshot(context, _controller);
 
-      // ৩. ছবি তোলার পর হালকা একটি ফ্ল্যাশ ইফেক্ট দিতে পারেন (অপশনাল)
-      debugPrint("Image Captured Successfully!");
+      if (path != null) {
+        setState(() {
+          _capturedImages.add(path); // লিস্টে নতুন ছবি যোগ হবে
+        });
+      }
 
     } catch (e) {
       debugPrint("Capture Error: $e");
@@ -165,7 +166,6 @@ class _MirrorScreenState extends State<MirrorScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ১. হেডার কন্ট্রোল (গ্যালারি খোলা থাকলে এটিও হাইড করতে পারেন চাইলে)
             if (!_isFullscreen && !_isGalleryOpen)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 5),
@@ -180,27 +180,17 @@ class _MirrorScreenState extends State<MirrorScreen> {
                     ),
                     const SizedBox(width: 8),
                     _buildSmallIconButton(
-                      // ১. ফ্রিজ থাকলে প্লে আইকন দেখাবে, না থাকলে পজ আইকন
                       icon: _isFrozen ? Icons.play_arrow : Icons.pause,
                       isActive: _isFrozen,
                       onTap: () async {
-                        // কন্ট্রোলার চেক করা হচ্ছে
                         if (_controller == null || !_controller!.value.isInitialized) return;
-
                         try {
                           if (_isFrozen) {
-                            // ২. যদি চেহারা আটকে থাকে, তবে আবার লাইভ মিরর শুরু হবে
                             await _controller!.resumePreview();
-                            setState(() {
-                              _isFrozen = false;
-                            });
+                            setState(() => _isFrozen = false);
                           } else {
-                            // ৩. চেহারা স্ক্রিনে আটকে দিবে (Freeze)
-                            // এটি শুধুই প্রিভিউ থামাবে, গ্যালারিতে কোনো ইমেজ সেভ হবে না
                             await _controller!.pausePreview();
-                            setState(() {
-                              _isFrozen = true;
-                            });
+                            setState(() => _isFrozen = true);
                           }
                         } catch (e) {
                           debugPrint("Freeze error: $e");
@@ -211,9 +201,8 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 ),
               ),
 
-            // ২. মেইন মিরর ফ্রেম (এটি ফ্লেক্সিবল হবে)
             Expanded(
-              flex: _isGalleryOpen ? 5 : 10, // গ্যালারি খুললে ক্যামেরা ছোট হয়ে উপরে উঠে যাবে
+              flex: _isGalleryOpen ? 5 : 10,
               child: Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: _isFullscreen ? 0 : 5,
@@ -234,16 +223,12 @@ class _MirrorScreenState extends State<MirrorScreen> {
               ),
             ),
 
-            // ৩. এই অংশটিই আপনার মূল উত্তর: কন্ডিশনাল গ্যালারি অথবা সেটিংস/অ্যাড
             if (_isGalleryOpen)
-              Expanded(
-                flex: 5, // গ্যালারি স্ক্রিনের অর্ধেক জায়গা নেবে
-                child: MirrorGalleryService.buildInAppGallery(
-                  onClose: () => setState(() => _isGalleryOpen = false),
-                ),
+              MirrorGalleryService.buildInAppGallery(
+                imagePaths: _capturedImages, // লিস্ট পাস করা হলো
+                onClose: () => setState(() => _isGalleryOpen = false),
               )
             else if (!_isFullscreen) ...[
-              // ৪. গ্যালারি বন্ধ থাকলে আগের মতো সেটিংস বা অ্যাড দেখাবে
               _isSettingsOpen
                   ? MirrorSettingsPanel(
                 isOpen: _isSettingsOpen,
@@ -251,8 +236,6 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 onModeChanged: (mode) => _handleModeChange(mode),
               )
                   : _buildAdBanner(),
-
-              // ৫. বটম সিস্টেম বার
               _buildBottomSystemBar(),
             ],
           ],
@@ -338,36 +321,33 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
   Widget _buildBottomSystemBar() {
     return SizedBox(
-      height: 35,
+      height: 45, // একটু হাইট বাড়ানো হয়েছে থাম্বনেইল দেখানোর জন্য
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // ১. বাম পাশের আইকন (গ্যালারি বা সেভ)
+          // বাম পাশের গ্যালারি আইকন (এখানে শেষ তোলা ছবি দেখাবে)
           GestureDetector(
-            onTap: () {
-              if (_isFrozen) {
-                // স্ক্রিন ফ্রিজ থাকলে সরাসরি গ্যালারিতে ছবি সেভ করবে
-                MirrorGalleryService.saveSnapshot(context, _controller);
-              } else {
-                // নরমাল মোডে থাকলে অ্যাপের ভেতরের গ্যালারি ওপেন করবে
-                setState(() {
-                  _isGalleryOpen = true; // এটি মেইন স্ক্রিনে গ্যালারি দেখাবে
-                  _isSettingsOpen = false; // গ্যালারি খুললে সেটিংস বন্ধ করে দেওয়া ভালো
-                });
-              }
-            },
+            onTap: () => setState(() => _isGalleryOpen = !_isGalleryOpen),
             child: Container(
-              padding: const EdgeInsets.all(4),
+              width: 35,
+              height: 35,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.08),
-                border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.8),
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white24),
+                image: _capturedImages.isNotEmpty
+                    ? DecorationImage(
+                    image: FileImage(File(_capturedImages.last)),
+                    fit: BoxFit.cover
+                )
+                    : null,
               ),
-              child: const Icon(Icons.crop_original, color: Colors.white, size: 20),
+              child: _capturedImages.isEmpty
+                  ? const Icon(Icons.crop_original, color: Colors.white, size: 18)
+                  : null,
             ),
           ),
 
-          // ২. মাঝখানের গোল বাটন (ক্যাপচার)
           GestureDetector(
             onTap: _onCaptureTap,
             child: Container(
@@ -381,12 +361,11 @@ class _MirrorScreenState extends State<MirrorScreen> {
             ),
           ),
 
-          // ৩. ডান পাশের সেটিংস টগল
           GestureDetector(
             onTap: () {
               setState(() {
                 _isSettingsOpen = !_isSettingsOpen;
-                _isGalleryOpen = false; // সেটিংস খুললে গ্যালারি বন্ধ হয়ে যাবে
+                _isGalleryOpen = false;
               });
             },
             child: Icon(
