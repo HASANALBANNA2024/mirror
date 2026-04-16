@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-
-import 'mirror_screen.dart';
+import 'package:mirror/splash_screen.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  // flutter native screen to catch
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   runApp(const MirrorApp());
 }
 
@@ -15,7 +17,7 @@ class MirrorApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(brightness: Brightness.dark),
-      home: const MirrorScreen(),
+      home: const SplashScreen(),
     );
   }
 }

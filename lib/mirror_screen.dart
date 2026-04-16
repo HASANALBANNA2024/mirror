@@ -403,7 +403,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
   Widget _buildBottomSystemBar() {
     return SizedBox(
-      height: 45,
+      height: 60,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
