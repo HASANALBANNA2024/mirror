@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// --- মিরর ফ্রেমের কাস্টম বর্ডার এবং লাইট ইফেক্ট উইজেট ---
+// --- ক্লিন অ্যান্ড ব্রাইট সলিড বর্ডার উইজেট (টোটাল শ্যাডো ফ্রি) ---
 class AuraMirrorBorder extends StatelessWidget {
   final bool isLightOn;
   final Widget child;
@@ -10,50 +10,39 @@ class AuraMirrorBorder extends StatelessWidget {
     super.key,
     required this.isLightOn,
     required this.child,
-    this.activeColor = Colors.white, // ডিফল্ট সাদা, লজিক অনুযায়ী চেঞ্জ হবে
+    this.activeColor = Colors.white,
   });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 300),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(25),
-        // লাইট অফ থাকলে সাদা বর্ডার (opacity 0.2), অন থাকলে activeColor
+        // কোনো boxShadow নেই, তাই আইকন থাকবে একদম ক্লিয়ার
         border: Border.all(
-          color: isLightOn ? activeColor : Colors.white.withOpacity(0.5),
-          width: isLightOn ? 7.0 : 4.5,
+          // লাইট অন হলে সলিড কড়া সাদা, অফ থাকলে হালকা সাদা
+          color: isLightOn ? Colors.white : Colors.white.withOpacity(0.3),
+
+          // লাইট অন হলে বর্ডার উইডথ ১০.০ করা হয়েছে যাতে আলো বেশি আসে
+          // আপনার যদি এটি বেশি চওড়া মনে হয়, তবে স্রেফ ৭.৫ বা ৮.০ করে দেবেন
+          width: isLightOn ? 3.0 : 3.0,
         ),
-        boxShadow: [
-          if (isLightOn)
-            BoxShadow(
-              color: activeColor.withOpacity(0.5),
-              blurRadius: 40,
-              spreadRadius: 10,
-            ),
-          // ডার্ক ডেপথ শ্যাডো (সবসময় থাকবে)
-          BoxShadow(
-            color: Colors.black.withOpacity(0.6),
-            blurRadius: 15,
-            spreadRadius: 2,
-          ),
-        ],
       ),
       child: ClipRRect(borderRadius: BorderRadius.circular(22), child: child),
     );
   }
 }
 
-// --- মিরর ফ্রেমের ভেতরের গ্রিড লাইন পেইন্টার ---
+// --- মিরর গ্রিড লাইন পেইন্টার ---
 class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white
-          .withOpacity(0.06) // খুবই হালকা সাদা লাইন
+      ..color = Colors.white.withOpacity(0.06)
       ..strokeWidth = 0.5;
 
-    // Vertical Lines (উলম্ব রেখা)
+    // Vertical Lines
     canvas.drawLine(
       Offset(size.width / 3, 0),
       Offset(size.width / 3, size.height),
@@ -65,7 +54,7 @@ class GridPainter extends CustomPainter {
       paint,
     );
 
-    // Horizontal Lines (অনুভূমিক রেখা)
+    // Horizontal Lines
     canvas.drawLine(
       Offset(0, size.height / 3),
       Offset(size.width, size.height / 3),
