@@ -1,8 +1,8 @@
-import 'package:camera/camera.dart'; // এই ইমপোর্টটি অবশ্যই লাগবে
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
-import 'mirror_frame_widgets.dart'; // আপনার নতুন উইজেট ফাইল
-import 'mirror_widgets.dart'; // আপনার গ্রিড পেইন্টার এবং Aura উইজেট
+import 'mirror_frame_widgets.dart';
+import 'mirror_widgets.dart';
 
 class MirrorScreen extends StatefulWidget {
   const MirrorScreen({super.key});
@@ -12,23 +12,24 @@ class MirrorScreen extends StatefulWidget {
 }
 
 class _MirrorScreenState extends State<MirrorScreen> {
-  // --- নতুন লজিক ভেরিয়েবলসমূহ ---
   CameraController? _controller;
   Future<void>? _initializeControllerFuture;
 
-  // --- আপনার আগের ভেরিয়েবলসমূহ ---
   double _zoomLevel = 1.0;
   bool _isLightOn = false;
   bool _isFrozen = false;
   bool _showHandIcon = false;
 
+  // নতুন ভেরিয়েবলসমূহ
+  bool _showGrid = true;
+  bool _isFullscreen = false;
+
   @override
   void initState() {
     super.initState();
-    _initCamera(); // অ্যাপ ওপেন হলে ক্যামেরা লোড হবে
+    _initCamera();
   }
 
-  // ক্যামেরা সেটআপ লজিক
   Future<void> _initCamera() async {
     try {
       final cameras = await availableCameras();
@@ -38,11 +39,27 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
       _controller = CameraController(
         frontCamera,
-        ResolutionPreset.high,
+        ResolutionPreset.max, // সর্বোচ্চ রেজোলিউশন
         enableAudio: false,
       );
 
       _initializeControllerFuture = _controller!.initialize();
+      await _initializeControllerFuture;
+
+      // এরর এড়াতে এবং বেটার ফোকাস পেতে নিচের ব্লকটি ব্যবহার করুন
+      if (_controller!.value.isInitialized) {
+        try {
+          // কিছু ডিভাইসে এটি সরাসরি সাপোর্ট নাও করতে পারে, তাই ট্রাই-ক্যাচ রাখা ভালো
+          // continuousVideo এর বদলে auto ট্রাই করুন অথবা চেক করে নিন
+          await _controller!.setFocusMode(FocusMode.auto);
+
+          // ExposureMode সাধারণত auto বা locked হয়
+          await _controller!.setExposureMode(ExposureMode.auto);
+        } catch (e) {
+          debugPrint("Focus/Exposure error: $e");
+        }
+      }
+
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint("Camera Error: $e");
@@ -51,14 +68,12 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
   @override
   void dispose() {
-    _controller?.dispose(); // ক্যামেরা রিলিজ করা
+    _controller?.dispose();
     super.dispose();
   }
 
   void _onMirrorTap() {
-    setState(() {
-      _showHandIcon = true;
-    });
+    setState(() => _showHandIcon = true);
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) setState(() => _showHandIcon = false);
     });
@@ -71,50 +86,55 @@ class _MirrorScreenState extends State<MirrorScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ১. আপনার হেডার এবং কন্ট্রোল প্যানেল
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 5),
-              child: Row(
-                children: [
-                  _buildCompactZoomSection(),
-                  const SizedBox(width: 10),
-                  _buildSmallIconButton(
-                    icon: _isLightOn
-                        ? Icons.lightbulb
-                        : Icons.lightbulb_outline,
-                    isActive: _isLightOn,
-                    onTap: () => setState(() => _isLightOn = !_isLightOn),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildSmallIconButton(
-                    icon: _isFrozen ? Icons.play_arrow : Icons.pause,
-                    isActive: _isFrozen,
-                    onTap: () => setState(() => _isFrozen = !_isFrozen),
-                  ),
-                ],
+            // ১. হেডার কন্ট্রোল (ফুলস্ক্রিন না থাকলে দেখাবে)
+            if (!_isFullscreen)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 5),
+                child: Row(
+                  children: [
+                    _buildCompactZoomSection(),
+                    const SizedBox(width: 10),
+                    _buildSmallIconButton(
+                      icon: _isLightOn
+                          ? Icons.lightbulb
+                          : Icons.lightbulb_outline,
+                      isActive: _isLightOn,
+                      onTap: () => setState(() => _isLightOn = !_isLightOn),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildSmallIconButton(
+                      icon: _isFrozen ? Icons.play_arrow : Icons.pause,
+                      isActive: _isFrozen,
+                      onTap: () => setState(() => _isFrozen = !_isFrozen),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            // ২. মেইন মিরর ফ্রেম (MirrorFrameView কল করা হচ্ছে)
+            // ২. মেইন মিরর ফ্রেম (এটি সব সময় থাকবে এবং বাকি জায়গা নেবে)
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0),
+                padding: EdgeInsets.symmetric(
+                  horizontal: _isFullscreen
+                      ? 0
+                      : 5, // ফুলস্ক্রিনে সাইড গ্যাপ থাকবে না
+                  vertical: 0,
+                ),
                 child: _buildMirrorFrame(),
               ),
             ),
 
-            // ৩. আপনার অ্যাড ব্যানার
-            _buildAdBanner(),
+            // ৩. অ্যাড ব্যানার (ফুলস্ক্রিন না থাকলে দেখাবে)
+            if (!_isFullscreen) _buildAdBanner(),
 
-            // ৪. আপনার বটম সিস্টেম বার
-            _buildBottomSystemBar(),
+            // ৪. বটম সিস্টেম বার (ফুলস্ক্রিন না থাকলে দেখাবে)
+            if (!_isFullscreen) _buildBottomSystemBar(),
           ],
         ),
       ),
     );
   }
 
-  // আপনার Mirror Frame কল
   Widget _buildMirrorFrame() {
     return MirrorFrameView(
       isLightOn: _isLightOn,
@@ -123,10 +143,15 @@ class _MirrorScreenState extends State<MirrorScreen> {
       initializeControllerFuture: _initializeControllerFuture,
       controller: _controller,
       gridLines: _buildGridLines(),
+      // নতুন প্যারামিটারগুলো এখানে পাস করা হয়েছে
+      showGrid: _showGrid,
+      onGridToggle: () => setState(() => _showGrid = !_showGrid),
+      isFullscreen: _isFullscreen,
+      onToggleFullscreen: () => setState(() => _isFullscreen = !_isFullscreen),
     );
   }
 
-  // --- আপনার বাকি উইজেটগুলো (ডিজাইন একদম সেম রাখা হয়েছে) ---
+  // --- বাকি উইজেটগুলো আগের মতোই থাকবে ---
 
   Widget _buildCompactZoomSection() {
     return Expanded(
@@ -156,7 +181,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 onChanged: (v) {
                   setState(() {
                     _zoomLevel = v;
-                    _controller?.setZoomLevel(v); // ক্যামেরা জুম হবে
+                    _controller?.setZoomLevel(v);
                   });
                 },
               ),
@@ -180,19 +205,10 @@ class _MirrorScreenState extends State<MirrorScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
             colors: isActive
                 ? [Colors.white, Colors.white]
                 : [const Color(0xFF2C2C2C), const Color(0xFF000000)],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.5),
-              offset: const Offset(2, 2),
-              blurRadius: 4,
-            ),
-          ],
           border: Border.all(
             color: isActive ? Colors.white : Colors.white.withOpacity(0.1),
             width: 0.8,
@@ -212,20 +228,16 @@ class _MirrorScreenState extends State<MirrorScreen> {
   );
 
   Widget _buildAdBanner() {
-    return Column(
-      children: [
-        const SizedBox(height: 5),
-        Container(
-          width: double.infinity,
-          height: 50,
-          color: Colors.black.withOpacity(0.8),
-          alignment: Alignment.center,
-          child: const Text(
-            "EXPLORE LA MER'S SIGNATURE REGIMEN",
-            style: TextStyle(color: Colors.white54, fontSize: 10),
-          ),
-        ),
-      ],
+    return Container(
+      margin: const EdgeInsets.only(top: 5),
+      width: double.infinity,
+      height: 50,
+      color: Colors.black.withOpacity(0.8),
+      alignment: Alignment.center,
+      child: const Text(
+        "EXPLORE LA MER'S SIGNATURE REGIMEN",
+        style: TextStyle(color: Colors.white54, fontSize: 10),
+      ),
     );
   }
 

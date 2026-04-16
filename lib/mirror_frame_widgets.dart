@@ -1,17 +1,20 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
-import 'mirror_widgets.dart'; // এখানে AuraMirrorBorder উইজেটটি আছে নিশ্চিত করুন
+import 'mirror_widgets.dart';
 
 class MirrorFrameView extends StatelessWidget {
   final bool isLightOn;
   final bool showHandIcon;
   final VoidCallback onTap;
   final Future<void>? initializeControllerFuture;
-
-  // CameraController-কে Nullable করা হয়েছে যাতে শুরুতে রেড লাইন না আসে
   final CameraController? controller;
   final Widget gridLines;
+
+  final bool showGrid;
+  final VoidCallback onGridToggle;
+  final bool isFullscreen;
+  final VoidCallback onToggleFullscreen;
 
   const MirrorFrameView({
     super.key,
@@ -19,8 +22,12 @@ class MirrorFrameView extends StatelessWidget {
     required this.showHandIcon,
     required this.onTap,
     required this.initializeControllerFuture,
-    this.controller, // এটি এখন অপশনাল, তাই লাল দাগ আসবে না
+    this.controller,
     required this.gridLines,
+    required this.showGrid,
+    required this.onGridToggle,
+    required this.isFullscreen,
+    required this.onToggleFullscreen,
   });
 
   @override
@@ -28,84 +35,146 @@ class MirrorFrameView extends StatelessWidget {
     return AuraMirrorBorder(
       isLightOn: isLightOn,
       activeColor: const Color(0xFFFFF4D2),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          color: Colors.black, // ক্যামেরার পেছনে সলিড ব্ল্যাক
-          width: double.infinity,
-          height: double.infinity,
-          child: FutureBuilder<void>(
-            future: initializeControllerFuture,
-            builder: (context, snapshot) {
-              // ক্যামেরা রেডি হলে এবং কন্ট্রোলার নাল না হলে প্রিভিউ দেখাবে
-              if (snapshot.connectionState == ConnectionState.done &&
-                  controller != null) {
-                return Stack(
-                  alignment: Alignment.center,
-                  fit: StackFit.expand,
-                  children: [
-                    // ১. মেইন ক্যামেরা প্রিভিউ
-                    CameraPreview(controller!),
+      child: Stack(
+        children: [
+          // ১. রিয়েলিস্টিক মিরর বেইজ
+          GestureDetector(
+            onTap: onTap,
+            child: Container(
+              color: Colors.black,
+              width: double.infinity,
+              height: double.infinity,
+              child: FutureBuilder<void>(
+                future: initializeControllerFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done &&
+                      controller != null) {
+                    return Stack(
+                      alignment: Alignment.center,
+                      fit: StackFit.expand,
+                      children: [
+                        // --- ক্যামেরা ভিউকে HD এবং ক্লিয়ার রাখার জন্য আপডেট ---
+                        ClipRect(
+                          child: OverflowBox(
+                            alignment: Alignment.center,
+                            child: FittedBox(
+                              fit: BoxFit
+                                  .cover, // এটি ভিউকে শার্প এবং ফুলস্ক্রিন রাখবে
+                              child: SizedBox(
+                                // সেন্সরের অরিজিনাল রেশিও মেইনটেইন করা হয়েছে
+                                width: controller!.value.previewSize!.height,
+                                height: controller!.value.previewSize!.width,
+                                child: CameraPreview(controller!),
+                              ),
+                            ),
+                          ),
+                        ),
 
-                    // ২. গ্রিড লাইনস
-                    gridLines,
+                        if (showGrid) gridLines,
+                        _buildRealisticGlassLayer(),
+                        _buildHandIcon(),
+                      ],
+                    );
+                  }
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1,
+                      color: Colors.white12,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
 
-                    // ৩. ক্রিস্টাল ক্লিয়ার রিফ্লেকশন লেয়ার
-                    _buildCrystalLayer(),
-
-                    // ৪. হ্যান্ড আইকন অ্যানিমেশন
-                    _buildHandIcon(),
-                  ],
-                );
-              } else {
-                // ক্যামেরা লোড হওয়ার সময় একটি সুন্দর লোডার
-                return const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white24,
+          // ২. স্মার্ট গ্রিড সুইচ (Alignment ফিক্স করা হয়েছে)
+          Positioned(
+            top: 10,
+            right: 10,
+            child: GestureDetector(
+              onTap: onGridToggle,
+              child: Opacity(
+                opacity: 0.5,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: 34,
+                  height: 18,
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: showGrid ? Colors.white : Colors.black38,
+                    border: Border.all(color: Colors.white10, width: 0.5),
                   ),
-                );
-              }
-            },
+                  child: AnimatedAlign(
+                    duration: const Duration(milliseconds: 300),
+                    // লজিক ঠিক করা হয়েছে: অন থাকলে ডানে, অফ থাকলে বামে
+                    alignment: showGrid
+                        ? Alignment.centerLeft
+                        : Alignment.centerRight,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: showGrid ? Colors.black : Colors.white70,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // ৩. ফুলস্ক্রিন টেক্সট
+          Positioned(
+            bottom: 12,
+            right: 12,
+            child: GestureDetector(
+              onTap: onToggleFullscreen,
+              child: Text(
+                isFullscreen ? "MINIMIZE" : "FULLSCREEN",
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.4),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRealisticGlassLayer() {
+    return IgnorePointer(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: const [0.0, 0.3, 0.7, 1.0],
+            colors: [
+              Colors.white.withOpacity(0.04),
+              Colors.transparent,
+              Colors.transparent,
+              Colors.white.withOpacity(0.03),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // কাঁচের মতো স্বচ্ছ আভা তৈরি করার জন্য রিফ্লেকশন লেয়ার
-  Widget _buildCrystalLayer() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.02),
-            Colors.transparent,
-            Colors.white.withOpacity(0.01),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ট্যাপ করলে হাতের আইকন দেখানোর লেয়ার
   Widget _buildHandIcon() {
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 200),
       opacity: showHandIcon ? 1.0 : 0.0,
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: const BoxDecoration(
-          color: Colors.black12,
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(
-          Icons.touch_app_outlined,
-          color: Colors.white70,
-          size: 60,
-        ),
+      child: Icon(
+        Icons.touch_app_outlined,
+        color: Colors.white.withOpacity(0.6),
+        size: 50,
       ),
     );
   }
