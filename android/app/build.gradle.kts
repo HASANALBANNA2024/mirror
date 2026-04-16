@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -15,25 +14,26 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // ✅ এখানে পরিবর্তন করা হয়েছে: 'jvmTarget' এর নতুন নিয়ম
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "17"
     }
 
     defaultConfig {
         applicationId = "com.example.mirror"
 
-        // এখানে flutter.minSdkVersion এর বদলে সরাসরি ২১ লিখে দেওয়া নিরাপদ
-        minSdk = 21
+        // ✅ ক্যামেরা প্যাকেজের জন্য এটি সরাসরি ২১ করে দেওয়া হলো
+        minSdk = flutter.minSdkVersion
 
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.code
+
+        // ✅ এখানে flutter.code এর বদলে flutter.versionCode হবে
+        versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
