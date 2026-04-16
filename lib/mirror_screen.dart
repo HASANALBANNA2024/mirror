@@ -118,18 +118,37 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
   // --- ক্যাপচার (মাঝখানের বাটন) লজিক ---
   void _onCaptureTap() async {
-    if (_timerValue > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Capturing in $_timerValue seconds..."),
-          duration: const Duration(seconds: 1),
-          backgroundColor: Colors.black87,
-        ),
-      );
-      await Future.delayed(Duration(seconds: _timerValue));
+    try {
+      if (_controller == null || !_controller!.value.isInitialized) return;
+
+      // ১. যদি টাইমার সেট করা থাকে (৩ বা ৫ সেকেন্ড)
+      if (_timerValue > 0) {
+        for (int i = _timerValue; i > 0; i--) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Center(
+                child: Text("$i", style: const TextStyle(fontSize: 50, fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+              duration: const Duration(seconds: 1),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
+          );
+          await Future.delayed(const Duration(seconds: 1));
+        }
+      }
+
+      // ২. টাইমার শেষ হওয়ার পর অথবা টাইমার না থাকলে (০ হলে) সরাসরি ছবি তুলবে
+      // MirrorGalleryService থেকে সরাসরি ছবি সেভ করার ফাংশন কল হবে
+      await MirrorGalleryService.saveSnapshot(context, _controller);
+
+      // ৩. ছবি তোলার পর হালকা একটি ফ্ল্যাশ ইফেক্ট দিতে পারেন (অপশনাল)
+      debugPrint("Image Captured Successfully!");
+
+    } catch (e) {
+      debugPrint("Capture Error: $e");
     }
-    // এখানে আপনার ইমেজ সেভ করার কোড বসবে
-    debugPrint("Snapped in $_activeMode Mode!");
   }
 
   void _onMirrorTap() {
@@ -161,9 +180,32 @@ class _MirrorScreenState extends State<MirrorScreen> {
                     ),
                     const SizedBox(width: 8),
                     _buildSmallIconButton(
+                      // ১. ফ্রিজ থাকলে প্লে আইকন দেখাবে, না থাকলে পজ আইকন
                       icon: _isFrozen ? Icons.play_arrow : Icons.pause,
                       isActive: _isFrozen,
-                      onTap: () => setState(() => _isFrozen = !_isFrozen),
+                      onTap: () async {
+                        // কন্ট্রোলার চেক করা হচ্ছে
+                        if (_controller == null || !_controller!.value.isInitialized) return;
+
+                        try {
+                          if (_isFrozen) {
+                            // ২. যদি চেহারা আটকে থাকে, তবে আবার লাইভ মিরর শুরু হবে
+                            await _controller!.resumePreview();
+                            setState(() {
+                              _isFrozen = false;
+                            });
+                          } else {
+                            // ৩. চেহারা স্ক্রিনে আটকে দিবে (Freeze)
+                            // এটি শুধুই প্রিভিউ থামাবে, গ্যালারিতে কোনো ইমেজ সেভ হবে না
+                            await _controller!.pausePreview();
+                            setState(() {
+                              _isFrozen = true;
+                            });
+                          }
+                        } catch (e) {
+                          debugPrint("Freeze error: $e");
+                        }
+                      },
                     ),
                   ],
                 ),
