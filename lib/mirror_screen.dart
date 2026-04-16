@@ -35,6 +35,8 @@ class _MirrorScreenState extends State<MirrorScreen> {
   Color _overlayColor = Colors.transparent;
   double _exposureLevel = 0.0;
   int _timerValue = 0;
+  int _currentCountdown = 0;
+
 
   // --- আপনার জন্য নতুন লিস্ট (গ্যালারি ইমেজ সেভ করার জন্য) ---
   List<String> _capturedImages = [];
@@ -124,34 +126,37 @@ class _MirrorScreenState extends State<MirrorScreen> {
     try {
       if (_controller == null || !_controller!.value.isInitialized) return;
 
+      // ১. যদি টাইমার ভ্যালু ০ এর বেশি হয় (৩ বা ৫ সেকেন্ড)
       if (_timerValue > 0) {
         for (int i = _timerValue; i > 0; i--) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Center(
-                child: Text("$i", style: const TextStyle(fontSize: 50, fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
-              duration: const Duration(seconds: 1),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-            ),
-          );
+
+          setState(() {
+            _currentCountdown = i; // স্ক্রিনের মাঝখানে দেখানোর জন্য স্টেট আপডেট
+          });
+
+          // ১ সেকেন্ড অপেক্ষা করবে
           await Future.delayed(const Duration(seconds: 1));
         }
+
+        // টাইমার শেষ হলে ০ করে দিবে যাতে স্ক্রিন থেকে সংখ্যাটি চলে যায়
+        setState(() {
+          _currentCountdown = 0;
+        });
       }
 
-      // ইমেজ সেভ করা এবং পাথ নেয়া (এটি আপনার এরর ফিক্স করবে)
+      // ২. ইমেজ সেভ করা এবং পাথ নেয়া
       String? path = await MirrorGalleryService.saveSnapshot(context, _controller);
 
       if (path != null) {
         setState(() {
-          _capturedImages.add(path); // লিস্টে নতুন ছবি যোগ হবে
+          _capturedImages.add(path); // গ্যালারি লিস্ট আপডেট হবে
         });
       }
 
     } catch (e) {
       debugPrint("Capture Error: $e");
+      setState(() => _currentCountdown = 0); // এরর হলেও টাইমার রিসেট
     }
   }
 
@@ -214,6 +219,28 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 child: Stack(
                   children: [
                     _buildMirrorFrame(),
+                    // timer count
+                    if (_currentCountdown > 0)
+                      Center( // এটি হরাইজন্টাল এবং ভার্টিক্যাল সেন্টার নিশ্চিত করে
+                        child: IgnorePointer(
+                          child: Text(
+                            "$_currentCountdown",
+                            style: TextStyle(
+                              fontSize: 120, // আপনার চাহিদা মতো বড় সাইজ
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white.withOpacity(0.9),
+                              shadows: const [
+                                Shadow(
+                                  blurRadius: 15,
+                                  color: Colors.black54,
+                                  offset: Offset(2, 4),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    // timer count end
                     if (_overlayColor != Colors.transparent)
                       IgnorePointer(
                         child: AnimatedContainer(
@@ -368,7 +395,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
   Widget _buildBottomSystemBar() {
     return SizedBox(
-      height: 45, // একটু হাইট বাড়ানো হয়েছে থাম্বনেইল দেখানোর জন্য
+      height: 45, // একটু হাইট বাড়ানো হয়েছে থাম্বনেইল দেখানোর জন্য
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -399,8 +426,8 @@ class _MirrorScreenState extends State<MirrorScreen> {
           GestureDetector(
             onTap: _onCaptureTap,
             child: Container(
-              width: 65, // আইকনটি সুন্দরভাবে দেখানোর জন্য সাইজ একটু বাড়ানো হয়েছে
-              height: 65,
+              width: 35, // আইকনটি সুন্দরভাবে দেখানোর জন্য সাইজ একটু বাড়ানো হয়েছে
+              height: 35,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white,
@@ -415,7 +442,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
               ),
               child: const Center(
                 child: Icon(
-                  Icons.camera_alt, // ক্যামেরা আইকন যোগ করা হয়েছে
+                  Icons.camera_alt, // ক্যামেরা আইকন যোগ করা হয়েছে
                   color: Color(0xFF121212), // ব্যাকগ্রাউন্ডের সাথে ম্যাচ করে ডার্ক কালার
                   size: 30,
                 ),
@@ -434,7 +461,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
             child: Icon(
               _isSettingsOpen ? Icons.keyboard_arrow_down : Icons.settings_outlined,
               color: _isSettingsOpen ? Colors.yellow : Colors.white,
-              size: 24,
+              size: 35,
             ),
           ),
         ],
