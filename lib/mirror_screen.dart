@@ -1,7 +1,8 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-
+import 'mirror_settings_panel.dart';
 import 'mirror_frame_widgets.dart';
+import 'mirror_gallery_service.dart';
 import 'mirror_widgets.dart';
 
 class MirrorScreen extends StatefulWidget {
@@ -19,10 +20,18 @@ class _MirrorScreenState extends State<MirrorScreen> {
   bool _isLightOn = false;
   bool _isFrozen = false;
   bool _showHandIcon = false;
-
-  // নতুন ভেরিয়েবলসমূহ
   bool _showGrid = true;
   bool _isFullscreen = false;
+
+  // সেটিংস ভেরিয়েবল
+  bool _isSettingsOpen = false;
+  bool _isGalleryOpen = false;
+  String _activeMode = "HD VIEW";
+
+  // ফাংশনাল লজিকের জন্য ভেরিয়েবল
+  Color _overlayColor = Colors.transparent;
+  double _exposureLevel = 0.0;
+  int _timerValue = 0;
 
   @override
   void initState() {
@@ -34,26 +43,21 @@ class _MirrorScreenState extends State<MirrorScreen> {
     try {
       final cameras = await availableCameras();
       final frontCamera = cameras.firstWhere(
-        (camera) => camera.lensDirection == CameraLensDirection.front,
+            (camera) => camera.lensDirection == CameraLensDirection.front,
       );
 
       _controller = CameraController(
         frontCamera,
-        ResolutionPreset.max, // সর্বোচ্চ রেজোলিউশন
+        ResolutionPreset.max,
         enableAudio: false,
       );
 
       _initializeControllerFuture = _controller!.initialize();
       await _initializeControllerFuture;
 
-      // এরর এড়াতে এবং বেটার ফোকাস পেতে নিচের ব্লকটি ব্যবহার করুন
       if (_controller!.value.isInitialized) {
         try {
-          // কিছু ডিভাইসে এটি সরাসরি সাপোর্ট নাও করতে পারে, তাই ট্রাই-ক্যাচ রাখা ভালো
-          // continuousVideo এর বদলে auto ট্রাই করুন অথবা চেক করে নিন
           await _controller!.setFocusMode(FocusMode.auto);
-
-          // ExposureMode সাধারণত auto বা locked হয়
           await _controller!.setExposureMode(ExposureMode.auto);
         } catch (e) {
           debugPrint("Focus/Exposure error: $e");
@@ -72,6 +76,62 @@ class _MirrorScreenState extends State<MirrorScreen> {
     super.dispose();
   }
 
+  // --- মোড হ্যান্ডেল করার ফাংশন ---
+  void _handleModeChange(String newMode) {
+    setState(() {
+      _activeMode = newMode;
+
+      // ডিফল্ট ভ্যালু রিসেট
+      _overlayColor = Colors.transparent;
+      _exposureLevel = 0.0;
+      _timerValue = 0;
+
+      switch (newMode) {
+        case "WARM LIGHT":
+          _overlayColor = Colors.orange.withOpacity(0.12); // হালকা সোনালি আভা
+          _exposureLevel = 0.3;
+          break;
+        case "COLD LIGHT":
+          _overlayColor = Colors.blue.withOpacity(0.08); // হালকা নীলচে আভা
+          _exposureLevel = 0.2;
+          break;
+        case "3S TIMER":
+          _timerValue = 3;
+          break;
+        case "5S TIMER":
+          _timerValue = 5;
+          break;
+        case "LOW LIGHT":
+          _exposureLevel = 1.2; // অন্ধকার মোডে এক্সপোজার বাড়ানো
+          break;
+        case "HD VIEW":
+          _exposureLevel = 0.0;
+          break;
+      }
+    });
+
+    // ক্যামেরা কন্ট্রোলারে এক্সপোজার সরাসরি আপডেট
+    if (_controller != null && _controller!.value.isInitialized) {
+      _controller!.setExposureOffset(_exposureLevel);
+    }
+  }
+
+  // --- ক্যাপচার (মাঝখানের বাটন) লজিক ---
+  void _onCaptureTap() async {
+    if (_timerValue > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Capturing in $_timerValue seconds..."),
+          duration: const Duration(seconds: 1),
+          backgroundColor: Colors.black87,
+        ),
+      );
+      await Future.delayed(Duration(seconds: _timerValue));
+    }
+    // এখানে আপনার ইমেজ সেভ করার কোড বসবে
+    debugPrint("Snapped in $_activeMode Mode!");
+  }
+
   void _onMirrorTap() {
     setState(() => _showHandIcon = true);
     Future.delayed(const Duration(milliseconds: 800), () {
@@ -86,8 +146,8 @@ class _MirrorScreenState extends State<MirrorScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ১. হেডার কন্ট্রোল (ফুলস্ক্রিন না থাকলে দেখাবে)
-            if (!_isFullscreen)
+            // ১. হেডার কন্ট্রোল (গ্যালারি খোলা থাকলে এটিও হাইড করতে পারেন চাইলে)
+            if (!_isFullscreen && !_isGalleryOpen)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 5),
                 child: Row(
@@ -95,9 +155,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
                     _buildCompactZoomSection(),
                     const SizedBox(width: 10),
                     _buildSmallIconButton(
-                      icon: _isLightOn
-                          ? Icons.lightbulb
-                          : Icons.lightbulb_outline,
+                      icon: _isLightOn ? Icons.lightbulb : Icons.lightbulb_outline,
                       isActive: _isLightOn,
                       onTap: () => setState(() => _isLightOn = !_isLightOn),
                     ),
@@ -111,24 +169,50 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 ),
               ),
 
-            // ২. মেইন মিরর ফ্রেম (এটি সব সময় থাকবে এবং বাকি জায়গা নেবে)
+            // ২. মেইন মিরর ফ্রেম (এটি ফ্লেক্সিবল হবে)
             Expanded(
+              flex: _isGalleryOpen ? 5 : 10, // গ্যালারি খুললে ক্যামেরা ছোট হয়ে উপরে উঠে যাবে
               child: Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: _isFullscreen
-                      ? 0
-                      : 5, // ফুলস্ক্রিনে সাইড গ্যাপ থাকবে না
+                  horizontal: _isFullscreen ? 0 : 5,
                   vertical: 0,
                 ),
-                child: _buildMirrorFrame(),
+                child: Stack(
+                  children: [
+                    _buildMirrorFrame(),
+                    if (_overlayColor != Colors.transparent)
+                      IgnorePointer(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          color: _overlayColor,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
 
-            // ৩. অ্যাড ব্যানার (ফুলস্ক্রিন না থাকলে দেখাবে)
-            if (!_isFullscreen) _buildAdBanner(),
+            // ৩. এই অংশটিই আপনার মূল উত্তর: কন্ডিশনাল গ্যালারি অথবা সেটিংস/অ্যাড
+            if (_isGalleryOpen)
+              Expanded(
+                flex: 5, // গ্যালারি স্ক্রিনের অর্ধেক জায়গা নেবে
+                child: MirrorGalleryService.buildInAppGallery(
+                  onClose: () => setState(() => _isGalleryOpen = false),
+                ),
+              )
+            else if (!_isFullscreen) ...[
+              // ৪. গ্যালারি বন্ধ থাকলে আগের মতো সেটিংস বা অ্যাড দেখাবে
+              _isSettingsOpen
+                  ? MirrorSettingsPanel(
+                isOpen: _isSettingsOpen,
+                activeMode: _activeMode,
+                onModeChanged: (mode) => _handleModeChange(mode),
+              )
+                  : _buildAdBanner(),
 
-            // ৪. বটম সিস্টেম বার (ফুলস্ক্রিন না থাকলে দেখাবে)
-            if (!_isFullscreen) _buildBottomSystemBar(),
+              // ৫. বটম সিস্টেম বার
+              _buildBottomSystemBar(),
+            ],
           ],
         ),
       ),
@@ -143,7 +227,6 @@ class _MirrorScreenState extends State<MirrorScreen> {
       initializeControllerFuture: _initializeControllerFuture,
       controller: _controller,
       gridLines: _buildGridLines(),
-      // নতুন প্যারামিটারগুলো এখানে পাস করা হয়েছে
       showGrid: _showGrid,
       onGridToggle: () => setState(() => _showGrid = !_showGrid),
       isFullscreen: _isFullscreen,
@@ -151,27 +234,15 @@ class _MirrorScreenState extends State<MirrorScreen> {
     );
   }
 
-  // --- বাকি উইজেটগুলো আগের মতোই থাকবে ---
-
   Widget _buildCompactZoomSection() {
     return Expanded(
       child: Row(
         children: [
-          const Text(
-            "ZOOM",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          const Text("ZOOM", style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
           Expanded(
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 1.5,
-                activeTrackColor: Colors.white,
-                inactiveTrackColor: Colors.white10,
-                thumbColor: Colors.white,
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
               ),
               child: Slider(
@@ -192,11 +263,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
     );
   }
 
-  Widget _buildSmallIconButton({
-    required IconData icon,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildSmallIconButton({required IconData icon, required bool isActive, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -205,58 +272,87 @@ class _MirrorScreenState extends State<MirrorScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
-            colors: isActive
-                ? [Colors.white, Colors.white]
-                : [const Color(0xFF2C2C2C), const Color(0xFF000000)],
+            colors: isActive ? [Colors.white, Colors.white] : [const Color(0xFF2C2C2C), const Color(0xFF000000)],
           ),
-          border: Border.all(
-            color: isActive ? Colors.white : Colors.white.withOpacity(0.1),
-            width: 0.8,
-          ),
+          border: Border.all(color: isActive ? Colors.white : Colors.white.withOpacity(0.1), width: 0.8),
         ),
-        child: Icon(
-          icon,
-          color: isActive ? Colors.black : Colors.white,
-          size: 20,
-        ),
+        child: Icon(icon, color: isActive ? Colors.black : Colors.white, size: 20),
       ),
     );
   }
 
-  Widget _buildGridLines() => IgnorePointer(
-    child: CustomPaint(size: Size.infinite, painter: GridPainter()),
-  );
+  Widget _buildGridLines() => IgnorePointer(child: CustomPaint(size: Size.infinite, painter: GridPainter()));
 
   Widget _buildAdBanner() {
     return Container(
       margin: const EdgeInsets.only(top: 5),
       width: double.infinity,
       height: 50,
-      color: Colors.black.withOpacity(0.8),
+      color: Colors.black87,
       alignment: Alignment.center,
-      child: const Text(
-        "EXPLORE LA MER'S SIGNATURE REGIMEN",
-        style: TextStyle(color: Colors.white54, fontSize: 10),
-      ),
+      child: const Text("EXPLORE PREMIUM FEATURES", style: TextStyle(color: Colors.white54, fontSize: 10)),
     );
   }
 
   Widget _buildBottomSystemBar() {
     return SizedBox(
-      height: 30,
+      height: 35,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          const Icon(Icons.crop_original, color: Colors.white, size: 24),
-          Container(
-            width: 18,
-            height: 18,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
+          // ১. বাম পাশের আইকন (গ্যালারি বা সেভ)
+          GestureDetector(
+            onTap: () {
+              if (_isFrozen) {
+                // স্ক্রিন ফ্রিজ থাকলে সরাসরি গ্যালারিতে ছবি সেভ করবে
+                MirrorGalleryService.saveSnapshot(context, _controller);
+              } else {
+                // নরমাল মোডে থাকলে অ্যাপের ভেতরের গ্যালারি ওপেন করবে
+                setState(() {
+                  _isGalleryOpen = true; // এটি মেইন স্ক্রিনে গ্যালারি দেখাবে
+                  _isSettingsOpen = false; // গ্যালারি খুললে সেটিংস বন্ধ করে দেওয়া ভালো
+                });
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.08),
+                border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.8),
+              ),
+              child: const Icon(Icons.crop_original, color: Colors.white, size: 20),
             ),
           ),
-          const Icon(Icons.settings_outlined, color: Colors.white, size: 24),
+
+          // ২. মাঝখানের গোল বাটন (ক্যাপচার)
+          GestureDetector(
+            onTap: _onCaptureTap,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(color: Colors.white12, width: 1.5),
+              ),
+            ),
+          ),
+
+          // ৩. ডান পাশের সেটিংস টগল
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _isSettingsOpen = !_isSettingsOpen;
+                _isGalleryOpen = false; // সেটিংস খুললে গ্যালারি বন্ধ হয়ে যাবে
+              });
+            },
+            child: Icon(
+              _isSettingsOpen ? Icons.keyboard_arrow_down : Icons.settings_outlined,
+              color: _isSettingsOpen ? Colors.yellow : Colors.white,
+              size: 24,
+            ),
+          ),
         ],
       ),
     );
