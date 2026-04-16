@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'mirror_settings_panel.dart';
 import 'mirror_frame_widgets.dart';
 import 'mirror_gallery_service.dart';
+import 'package:share_plus/share_plus.dart';
 import 'mirror_widgets.dart';
 
 class MirrorScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
   bool _showGrid = true;
   bool _isFullscreen = false;
 
+
   // সেটিংস ভেরিয়েবল
   bool _isSettingsOpen = false;
   bool _isGalleryOpen = false;
@@ -36,6 +38,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
   // --- আপনার জন্য নতুন লিস্ট (গ্যালারি ইমেজ সেভ করার জন্য) ---
   List<String> _capturedImages = [];
+  List<String> _selectedImages = [];
 
   @override
   void initState() {
@@ -225,8 +228,52 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
             if (_isGalleryOpen)
               MirrorGalleryService.buildInAppGallery(
-                imagePaths: _capturedImages, // লিস্ট পাস করা হলো
-                onClose: () => setState(() => _isGalleryOpen = false),
+                imagePaths: _capturedImages,
+                selectedPaths: _selectedImages, // এটি আপনার নতুন লিস্ট
+                onClose: () {
+                  setState(() {
+                    _isGalleryOpen = false;
+                    _selectedImages.clear(); // বন্ধ করলে সিলেকশন মুছে যাবে
+                  });
+                },
+                onLongPress: (path) {
+                  setState(() {
+                    // লং প্রেস করলে সিলেক্ট হবে
+                    if (_selectedImages.contains(path)) {
+                      _selectedImages.remove(path);
+                    } else {
+                      _selectedImages.add(path);
+                    }
+                  });
+                },
+                onTap: (path) {
+                  if (_selectedImages.isNotEmpty) {
+                    setState(() {
+                      if (_selectedImages.contains(path)) {
+                        _selectedImages.remove(path);
+                      } else {
+                        _selectedImages.add(path);
+                      }
+                    });
+                  } else {
+                    // এখানে চাইলে সিঙ্গেল ট্যাপে ছবি বড় করে দেখার লজিক দিতে পারেন
+                    debugPrint("Single tap on: $path");
+                  }
+                },
+                onDeleteAll: () {
+                  setState(() {
+                    // সিলেক্ট করা সব ছবি একসাথে ডিলিট
+                    _capturedImages.removeWhere((item) => _selectedImages.contains(item));
+                    _selectedImages.clear();
+                  });
+                },
+                onShareAll: () async {
+                  // সিলেক্ট করা সব ছবি একসাথে শেয়ার
+                  if (_selectedImages.isNotEmpty) {
+                    final files = _selectedImages.map((path) => XFile(path)).toList();
+                    await Share.shareXFiles(files);
+                  }
+                },
               )
             else if (!_isFullscreen) ...[
               _isSettingsOpen
@@ -348,19 +395,35 @@ class _MirrorScreenState extends State<MirrorScreen> {
             ),
           ),
 
+          // ২. মাঝখানের ক্যামেরা বাটন (ক্যাপচার)
           GestureDetector(
             onTap: _onCaptureTap,
             child: Container(
-              width: 20,
-              height: 20,
+              width: 65, // আইকনটি সুন্দরভাবে দেখানোর জন্য সাইজ একটু বাড়ানো হয়েছে
+              height: 65,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white,
-                border: Border.all(color: Colors.white12, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  ),
+                ],
+                border: Border.all(color: Colors.white12, width: 2),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.camera_alt, // ক্যামেরা আইকন যোগ করা হয়েছে
+                  color: Color(0xFF121212), // ব্যাকগ্রাউন্ডের সাথে ম্যাচ করে ডার্ক কালার
+                  size: 30,
+                ),
               ),
             ),
           ),
 
+          // setting icon
           GestureDetector(
             onTap: () {
               setState(() {
