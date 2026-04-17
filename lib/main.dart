@@ -7,6 +7,7 @@ void main() async {
   // flutter native screen to catch
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   runApp(const MirrorApp());
+  //final done project of Mirror
 }
 
 class MirrorApp extends StatelessWidget {
