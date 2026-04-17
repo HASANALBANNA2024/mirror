@@ -1,11 +1,13 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
-import 'package:share_plus/share_plus.dart';
 
 class MirrorGalleryService {
-
-  static Future<String?> saveSnapshot(BuildContext context, dynamic controller) async {
+  static Future<String?> saveSnapshot(
+    BuildContext context,
+    dynamic controller,
+  ) async {
     try {
       if (controller == null || !controller.value.isInitialized) return null;
       final image = await controller.takePicture();
@@ -47,23 +49,50 @@ class MirrorGalleryService {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 selectedPaths.isEmpty
-                    ? const Text("GALLERY", style: TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1))
-                    : Text("${selectedPaths.length} SELECTED", style: const TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ? const Text(
+                        "GALLERY",
+                        style: TextStyle(
+                          color: Colors.white38,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      )
+                    : Text(
+                        "${selectedPaths.length} SELECTED",
+                        style: const TextStyle(
+                          color: Colors.blueAccent,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
 
                 Row(
                   children: [
                     if (selectedPaths.isNotEmpty) ...[
                       IconButton(
-                        icon: const Icon(Icons.share, color: Colors.blueAccent, size: 18),
+                        icon: const Icon(
+                          Icons.share,
+                          color: Colors.blueAccent,
+                          size: 18,
+                        ),
                         onPressed: onShareAll,
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.redAccent, size: 18),
+                        icon: const Icon(
+                          Icons.delete,
+                          color: Colors.redAccent,
+                          size: 18,
+                        ),
                         onPressed: onDeleteAll,
                       ),
                     ],
                     IconButton(
-                      icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white54, size: 20),
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Colors.white54,
+                        size: 20,
+                      ),
                       onPressed: onClose,
                     ),
                   ],
@@ -78,7 +107,7 @@ class MirrorGalleryService {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: imagePaths.length,
               itemBuilder: (context, index) {
-                // নতুন ছবিগুলো আগে দেখানোর জন্য reversed লিস্ট
+                // new picture first display
                 List<String> reversedList = imagePaths.reversed.toList();
                 String path = reversedList[index];
                 bool isSelected = selectedPaths.contains(path);
@@ -87,9 +116,9 @@ class MirrorGalleryService {
                   onLongPress: () => onLongPress(path),
                   onTap: () {
                     if (selectedPaths.isNotEmpty) {
-                      onTap(path); // সিলেকশন মোড চালু থাকলে সিলেক্ট করবে
+                      onTap(path); // Selection mode on
                     } else {
-                      // সিলেকশন না থাকলে ফুল স্ক্রিন ভিউয়ার ওপেন করবে
+                      // no selection full screen view
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -110,7 +139,9 @@ class MirrorGalleryService {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: isSelected ? Colors.blueAccent : Colors.white10,
+                            color: isSelected
+                                ? Colors.blueAccent
+                                : Colors.white10,
                             width: isSelected ? 2.5 : 1,
                           ),
                         ),
@@ -126,7 +157,11 @@ class MirrorGalleryService {
                           child: CircleAvatar(
                             radius: 9,
                             backgroundColor: Colors.blueAccent,
-                            child: Icon(Icons.check, size: 10, color: Colors.white),
+                            child: Icon(
+                              Icons.check,
+                              size: 10,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                     ],
@@ -141,7 +176,7 @@ class MirrorGalleryService {
   }
 }
 
-// --- ফুল স্ক্রিন ইমেজ ভিউয়ার ক্লাস (Swipeable) ---
+// --- full screen viewer (Swipeable) ---
 class FullScreenImageViewer extends StatelessWidget {
   final List<String> imagePaths;
   final int initialIndex;
@@ -177,7 +212,7 @@ class FullScreenImageViewer extends StatelessWidget {
               maxScale: 4.0,
               child: Image.file(
                 File(imagePaths[index]),
-                fit: BoxFit.contain, // ছবি অনুযায়ী পুরো স্ক্রিন নিবে
+                fit: BoxFit.contain, // full screen to image
               ),
             ),
           );

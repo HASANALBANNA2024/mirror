@@ -6,7 +6,7 @@ class MirrorLogic {
 
   Future<void> initCamera() async {
     cameras = await availableCameras();
-    // সামনের ক্যামেরা সিলেক্ট করা
+    // front camera select
     final front = cameras!.firstWhere(
       (c) => c.lensDirection == CameraLensDirection.front,
     );

@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+
 import 'mirror_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -10,7 +12,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
 
@@ -18,33 +21,31 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
 
-    // ১. নেটিভ সাদা স্ক্রিনটি সরিয়ে ফেলবে যখন ফ্ল্যাটার রেন্ডার করা শুরু করবে
+    // navigate to flutter render
     FlutterNativeSplash.remove();
 
-    // ২. এনিমেশন সেটআপ
+    // animation setup
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
 
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
 
     _controller.forward();
 
-    // ৩. ৩ সেকেন্ড পর মিরর স্ক্রিনে চলে যাবে
+    // mirror screen
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const MirrorScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              // আরও প্রফেশনাল ট্রানজিশন (Fade)
-              return FadeTransition(opacity: animation, child: child);
-            },
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const MirrorScreen(),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
             transitionDuration: const Duration(milliseconds: 800),
           ),
         );
@@ -61,7 +62,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212), // আপনার অ্যাপের ব্যাকগ্রাউন্ড কালার
+      backgroundColor: const Color(
+        0xFF121212,
+      ), // আপনার অ্যাপের ব্যাকগ্রাউন্ড কালার
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -78,7 +81,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   border: Border.all(color: Colors.white12, width: 2),
                 ),
                 child: const Icon(
-                  Icons.face_retouching_natural,// এখানে আপনার পছন্দের আইকন বা Image.asset দিতে পারেন
+                  Icons.face_retouching_natural,
                   color: Colors.white,
                   size: 50,
                 ),

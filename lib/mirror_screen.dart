@@ -1,11 +1,13 @@
 import 'dart:io';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'mirror_settings_panel.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart'; //data save package
+
 import 'mirror_frame_widgets.dart';
 import 'mirror_gallery_service.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // ডাটা সেভ করার জন্য
+import 'mirror_settings_panel.dart';
 import 'mirror_widgets.dart';
 
 class MirrorScreen extends StatefulWidget {
@@ -19,7 +21,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
   CameraController? _controller;
   Future<void>? _initializeControllerFuture;
 
-  // জুম সিঙ্ক করার জন্য কন্ট্রোলার (UI পরিবর্তন করবে না)
+  // Zoom Sync Controller
   final TransformationController _zoomController = TransformationController();
 
   double _zoomLevel = 1.0;
@@ -45,16 +47,16 @@ class _MirrorScreenState extends State<MirrorScreen> {
   void initState() {
     super.initState();
     _initCamera();
-    _loadImagesFromDisk(); // অ্যাপ খুললে পুরনো ছবি লোড হবে
+    _loadImagesFromDisk(); // to open old picture after open this app
   }
 
-  // ১. ইমেজ লিস্ট ফোনে সেভ করার লজিক
+  // to save image list function
   Future<void> _saveImagesToDisk() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('captured_images', _capturedImages);
   }
 
-  // ২. ফোন থেকে ইমেজ লিস্ট লোড করার লজিক
+  // phone image to gallery
   Future<void> _loadImagesFromDisk() async {
     final prefs = await SharedPreferences.getInstance();
     final List<String>? savedImages = prefs.getStringList('captured_images');
@@ -67,7 +69,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
     try {
       final cameras = await availableCameras();
       final frontCamera = cameras.firstWhere(
-            (camera) => camera.lensDirection == CameraLensDirection.front,
+        (camera) => camera.lensDirection == CameraLensDirection.front,
       );
 
       _controller = CameraController(
@@ -141,13 +143,15 @@ class _MirrorScreenState extends State<MirrorScreen> {
         setState(() => _currentCountdown = 0);
       }
 
-      String? path = await MirrorGalleryService.saveSnapshot(context, _controller);
+      String? path = await MirrorGalleryService.saveSnapshot(
+        context,
+        _controller,
+      );
 
       if (path != null) {
         setState(() => _capturedImages.add(path));
-        await _saveImagesToDisk(); // ছবি তোলার পর লিস্ট সেভ
+        await _saveImagesToDisk(); // camera to capture picture
       }
-
     } catch (e) {
       debugPrint("Capture Error: $e");
       setState(() => _currentCountdown = 0);
@@ -156,7 +160,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
   void _onMirrorTap() {
     setState(() {
-      // ট্যাপ করলে জুম লজিক
+      // Tap to Zoom
       if (_zoomLevel < 5.0) {
         _zoomLevel += 1.0;
       } else {
@@ -186,7 +190,9 @@ class _MirrorScreenState extends State<MirrorScreen> {
                     _buildCompactZoomSection(),
                     const SizedBox(width: 10),
                     _buildSmallIconButton(
-                      icon: _isLightOn ? Icons.lightbulb : Icons.lightbulb_outline,
+                      icon: _isLightOn
+                          ? Icons.lightbulb
+                          : Icons.lightbulb_outline,
                       isActive: _isLightOn,
                       onTap: () => setState(() => _isLightOn = !_isLightOn),
                     ),
@@ -195,7 +201,9 @@ class _MirrorScreenState extends State<MirrorScreen> {
                       icon: _isFrozen ? Icons.play_arrow : Icons.pause,
                       isActive: _isFrozen,
                       onTap: () async {
-                        if (_controller == null || !_controller!.value.isInitialized) return;
+                        if (_controller == null ||
+                            !_controller!.value.isInitialized)
+                          return;
                         try {
                           if (_isFrozen) {
                             await _controller!.resumePreview();
@@ -222,7 +230,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 ),
                 child: Stack(
                   children: [
-                    // ২ আঙুলে জুম লজিক যা UI এর ক্ষতি করবে না
+                    // 2 finger function of Zoom
                     InteractiveViewer(
                       transformationController: _zoomController,
                       minScale: 1.0,
@@ -230,7 +238,9 @@ class _MirrorScreenState extends State<MirrorScreen> {
                       onInteractionUpdate: (details) {
                         if (details.scale != 1.0) {
                           setState(() {
-                            _zoomLevel = _zoomController.value.getMaxScaleOnAxis().clamp(1.0, 5.0);
+                            _zoomLevel = _zoomController.value
+                                .getMaxScaleOnAxis()
+                                .clamp(1.0, 5.0);
                             _controller?.setZoomLevel(_zoomLevel);
                           });
                         }
@@ -247,7 +257,13 @@ class _MirrorScreenState extends State<MirrorScreen> {
                               fontSize: 120,
                               fontWeight: FontWeight.w900,
                               color: Colors.white.withOpacity(0.9),
-                              shadows: const [Shadow(blurRadius: 15, color: Colors.black54, offset: Offset(2, 4))],
+                              shadows: const [
+                                Shadow(
+                                  blurRadius: 15,
+                                  color: Colors.black54,
+                                  offset: Offset(2, 4),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -297,14 +313,18 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 },
                 onDeleteAll: () {
                   setState(() {
-                    _capturedImages.removeWhere((item) => _selectedImages.contains(item));
+                    _capturedImages.removeWhere(
+                      (item) => _selectedImages.contains(item),
+                    );
                     _selectedImages.clear();
                   });
-                  _saveImagesToDisk(); // ডিলিট করার পর স্টোরেজ আপডেট
+                  _saveImagesToDisk(); // Delete to picture
                 },
                 onShareAll: () async {
                   if (_selectedImages.isNotEmpty) {
-                    final files = _selectedImages.map((path) => XFile(path)).toList();
+                    final files = _selectedImages
+                        .map((path) => XFile(path))
+                        .toList();
                     await Share.shareXFiles(files);
                   }
                 },
@@ -312,10 +332,10 @@ class _MirrorScreenState extends State<MirrorScreen> {
             else if (!_isFullscreen) ...[
               _isSettingsOpen
                   ? MirrorSettingsPanel(
-                isOpen: _isSettingsOpen,
-                activeMode: _activeMode,
-                onModeChanged: (mode) => _handleModeChange(mode),
-              )
+                      isOpen: _isSettingsOpen,
+                      activeMode: _activeMode,
+                      onModeChanged: (mode) => _handleModeChange(mode),
+                    )
                   : _buildAdBanner(),
               _buildBottomSystemBar(),
             ],
@@ -344,7 +364,14 @@ class _MirrorScreenState extends State<MirrorScreen> {
     return Expanded(
       child: Row(
         children: [
-          const Text("ZOOM", style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+          const Text(
+            "ZOOM",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           Expanded(
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
@@ -358,7 +385,8 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 onChanged: (v) {
                   setState(() {
                     _zoomLevel = v;
-                    _zoomController.value = Matrix4.identity()..scale(_zoomLevel);
+                    _zoomController.value = Matrix4.identity()
+                      ..scale(_zoomLevel);
                     _controller?.setZoomLevel(v);
                   });
                 },
@@ -370,7 +398,11 @@ class _MirrorScreenState extends State<MirrorScreen> {
     );
   }
 
-  Widget _buildSmallIconButton({required IconData icon, required bool isActive, required VoidCallback onTap}) {
+  Widget _buildSmallIconButton({
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -379,16 +411,27 @@ class _MirrorScreenState extends State<MirrorScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
-            colors: isActive ? [Colors.white, Colors.white] : [const Color(0xFF2C2C2C), const Color(0xFF000000)],
+            colors: isActive
+                ? [Colors.white, Colors.white]
+                : [const Color(0xFF2C2C2C), const Color(0xFF000000)],
           ),
-          border: Border.all(color: isActive ? Colors.white : Colors.white.withOpacity(0.1), width: 0.8),
+          border: Border.all(
+            color: isActive ? Colors.white : Colors.white.withOpacity(0.1),
+            width: 0.8,
+          ),
         ),
-        child: Icon(icon, color: isActive ? Colors.black : Colors.white, size: 20),
+        child: Icon(
+          icon,
+          color: isActive ? Colors.black : Colors.white,
+          size: 20,
+        ),
       ),
     );
   }
 
-  Widget _buildGridLines() => IgnorePointer(child: CustomPaint(size: Size.infinite, painter: GridPainter()));
+  Widget _buildGridLines() => IgnorePointer(
+    child: CustomPaint(size: Size.infinite, painter: GridPainter()),
+  );
 
   Widget _buildAdBanner() {
     return Container(
@@ -397,7 +440,10 @@ class _MirrorScreenState extends State<MirrorScreen> {
       height: 50,
       color: Colors.black87,
       alignment: Alignment.center,
-      child: const Text("EXPLORE PREMIUM FEATURES", style: TextStyle(color: Colors.white54, fontSize: 10)),
+      child: const Text(
+        "EXPLORE PREMIUM FEATURES",
+        style: TextStyle(color: Colors.white54, fontSize: 10),
+      ),
     );
   }
 
@@ -410,21 +456,25 @@ class _MirrorScreenState extends State<MirrorScreen> {
           GestureDetector(
             onTap: () => setState(() => _isGalleryOpen = !_isGalleryOpen),
             child: Container(
-              width: 35,
-              height: 35,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                 color: Colors.white10,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.white24),
                 image: _capturedImages.isNotEmpty
                     ? DecorationImage(
-                    image: FileImage(File(_capturedImages.last)),
-                    fit: BoxFit.cover
-                )
+                        image: FileImage(File(_capturedImages.last)),
+                        fit: BoxFit.cover,
+                      )
                     : null,
               ),
               child: _capturedImages.isEmpty
-                  ? const Icon(Icons.crop_original, color: Colors.white, size: 18)
+                  ? const Icon(
+                      Icons.crop_original,
+                      color: Colors.white,
+                      size: 18,
+                    )
                   : null,
             ),
           ),
@@ -464,9 +514,11 @@ class _MirrorScreenState extends State<MirrorScreen> {
               });
             },
             child: Icon(
-              _isSettingsOpen ? Icons.keyboard_arrow_down : Icons.settings_outlined,
+              _isSettingsOpen
+                  ? Icons.keyboard_arrow_down
+                  : Icons.settings_outlined,
               color: _isSettingsOpen ? Colors.yellow : Colors.white,
-              size: 35,
+              size: 30,
             ),
           ),
         ],

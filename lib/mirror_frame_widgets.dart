@@ -37,7 +37,7 @@ class MirrorFrameView extends StatelessWidget {
       activeColor: const Color(0xFFFFF4D2),
       child: Stack(
         children: [
-          // ১. রিয়েলিস্টিক মিরর বেইজ
+          // Realistic Mirror base
           GestureDetector(
             onTap: onTap,
             child: Container(
@@ -53,15 +53,15 @@ class MirrorFrameView extends StatelessWidget {
                       alignment: Alignment.center,
                       fit: StackFit.expand,
                       children: [
-                        // --- ক্যামেরা ভিউকে HD এবং ক্লিয়ার রাখার জন্য আপডেট ---
+                        // ---Camera HD ---
                         ClipRect(
                           child: OverflowBox(
                             alignment: Alignment.center,
                             child: FittedBox(
-                              fit: BoxFit
-                                  .cover, // এটি ভিউকে শার্প এবং ফুলস্ক্রিন রাখবে
+                              fit:
+                                  BoxFit.cover, // sharp and full screen to view
                               child: SizedBox(
-                                // সেন্সরের অরিজিনাল রেশিও মেইনটেইন করা হয়েছে
+                                // to maintain sensor original view
                                 width: controller!.value.previewSize!.height,
                                 height: controller!.value.previewSize!.width,
                                 child: CameraPreview(controller!),
@@ -87,7 +87,7 @@ class MirrorFrameView extends StatelessWidget {
             ),
           ),
 
-          // ২. স্মার্ট গ্রিড সুইচ (Alignment ফিক্স করা হয়েছে)
+          // smart grid switch
           Positioned(
             top: 10,
             right: 10,
@@ -107,7 +107,7 @@ class MirrorFrameView extends StatelessWidget {
                   ),
                   child: AnimatedAlign(
                     duration: const Duration(milliseconds: 300),
-                    // লজিক ঠিক করা হয়েছে: অন থাকলে ডানে, অফ থাকলে বামে
+                    // logic to grid switch
                     alignment: showGrid
                         ? Alignment.centerLeft
                         : Alignment.centerRight,
@@ -132,11 +132,11 @@ class MirrorFrameView extends StatelessWidget {
             child: GestureDetector(
               onTap: onToggleFullscreen,
               child: Text(
-                isFullscreen ? "MINIMIZE" : "FULLSCREEN",
+                isFullscreen ? "DEFAULT" : "FULLSCREEN",
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w300,
+                  color: Colors.black.withOpacity(1.0),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                   letterSpacing: 1.5,
                 ),
               ),

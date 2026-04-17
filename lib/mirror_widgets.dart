@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// --- ক্লিন অ্যান্ড ব্রাইট সলিড বর্ডার উইজেট (টোটাল শ্যাডো ফ্রি) ---
+// --- screen bright solid border  ---
 class AuraMirrorBorder extends StatelessWidget {
   final bool isLightOn;
   final Widget child;
@@ -19,13 +19,11 @@ class AuraMirrorBorder extends StatelessWidget {
       duration: const Duration(milliseconds: 300),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(25),
-        // কোনো boxShadow নেই, তাই আইকন থাকবে একদম ক্লিয়ার
         border: Border.all(
-          // লাইট অন হলে সলিড কড়া সাদা, অফ থাকলে হালকা সাদা
+          // light on to border full white
           color: isLightOn ? Colors.white : Colors.white.withOpacity(0.3),
 
-          // লাইট অন হলে বর্ডার উইডথ ১০.০ করা হয়েছে যাতে আলো বেশি আসে
-          // আপনার যদি এটি বেশি চওড়া মনে হয়, তবে স্রেফ ৭.৫ বা ৮.০ করে দেবেন
+          // light border
           width: isLightOn ? 3.0 : 3.0,
         ),
       ),
@@ -34,7 +32,7 @@ class AuraMirrorBorder extends StatelessWidget {
   }
 }
 
-// --- মিরর গ্রিড লাইন পেইন্টার ---
+// --- Mirror grid line painter---
 class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

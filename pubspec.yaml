@@ -1,7 +1,7 @@
 name: mirror
 description: "A premium Flutter mirror application."
 
-# এটি ব্যবহার করলে ভুল করে পাবলিকে আপলোড হবে না
+# mistake public upload issue
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -13,20 +13,20 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # ক্যামেরার মেইন প্যাকেজ
+  # Camera Main package
   camera: ^0.11.0+2
   gal: ^2.3.2
   path_provider: ^2.1.2
 
-  # স্ক্রিন ব্রাইটনেস কন্ট্রোল
+  # Screen Brightness
   screen_brightness: ^2.1.7
 
-  # আইকন এবং শেয়ারিং
+  # Icon and sharing
   cupertino_icons: ^1.0.8
   share_plus: ^13.0.0
   shared_preferences: ^2.5.5
 
-  # নেটিভ স্প্ল্যাশ স্ক্রিন প্যাকেজ (dependencies এ থাকা ভালো)
+  # Native Screen package
   flutter_native_splash: ^2.4.0
 
 dev_dependencies:
@@ -34,18 +34,27 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^3.0.0
 
-# নেটিভ স্প্ল্যাশ কনফিগারেশন (এটি আলাদা ব্লকে থাকবে)
+  # Icon Package
+  flutter_launcher_icons: ^0.13.1
+
+# Launcher Icon
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/app_icon.png"
+
+  # Icon Background
+  adaptive_icon_background: "#121212"
+
+  # main icon generate
+  adaptive_icon_foreground: "assets/images/app_icon.png"
+
+# Native splash screen configuration
 flutter_native_splash:
-  color: "#121212"
-  android_12:
-    color: "#121212"
-    # লোগো থাকলে এখানে পাথ দিতে পারেন
-    # image: assets/splash_icon.png
+
+color: "#121212"
 
 flutter:
-  # মেটেরিয়াল ডিজাইন আইকন এবং উইজেট ব্যবহারের জন্য
   uses-material-design: true
-
-  # যদি ভবিষ্যতে লোগো বা ইমেজ ব্যবহার করেন তবে এখানে ফোল্ডারটি অ্যাড করবেন
-  # assets:
-  #   - assets/
+  assets:
+    - assets/images/app_icon.png
