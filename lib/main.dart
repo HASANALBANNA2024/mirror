@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mirror/splash_screen.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:mirror/screens/splash_screen.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();

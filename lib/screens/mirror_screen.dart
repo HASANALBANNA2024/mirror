@@ -4,11 +4,13 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart'; //data save package
+// ignore: depend_on_referenced_packages
+import "package:vector_math/vector_math_64.dart" hide Colors, Matrix4;
 
-import 'mirror_frame_widgets.dart';
-import 'mirror_gallery_service.dart';
-import 'mirror_settings_panel.dart';
-import 'mirror_widgets.dart';
+import '../service/mirror_gallery_service.dart';
+import '../widgets/mirror_frame_widgets.dart';
+import '../widgets/mirror_settings_panel.dart';
+import '../widgets/mirror_widgets.dart';
 
 class MirrorScreen extends StatefulWidget {
   const MirrorScreen({super.key});
@@ -41,7 +43,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
   int _currentCountdown = 0;
 
   List<String> _capturedImages = [];
-  List<String> _selectedImages = [];
+  final List<String> _selectedImages = [];
 
   @override
   void initState() {
@@ -103,11 +105,11 @@ class _MirrorScreenState extends State<MirrorScreen> {
 
       switch (newMode) {
         case "WARM LIGHT":
-          _overlayColor = Colors.orange.withOpacity(0.12);
+          _overlayColor = Colors.orange.withValues(alpha: 0.12);
           _exposureLevel = 0.3;
           break;
         case "COLD LIGHT":
-          _overlayColor = Colors.blue.withOpacity(0.08);
+          _overlayColor = Colors.blue.withValues(alpha: 0.08);
           _exposureLevel = 0.2;
           break;
         case "3S TIMER":
@@ -143,6 +145,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
         setState(() => _currentCountdown = 0);
       }
 
+      if (!mounted) return;
       String? path = await MirrorGalleryService.saveSnapshot(
         context,
         _controller,
@@ -166,7 +169,8 @@ class _MirrorScreenState extends State<MirrorScreen> {
       } else {
         _zoomLevel = 1.0;
       }
-      _zoomController.value = Matrix4.identity()..scale(_zoomLevel);
+      _zoomController.value = Matrix4.identity()
+        ..scaleByVector3(Vector3(_zoomLevel, _zoomLevel, 1.0));
       _controller?.setZoomLevel(_zoomLevel);
       _showHandIcon = true;
     });
@@ -202,8 +206,9 @@ class _MirrorScreenState extends State<MirrorScreen> {
                       isActive: _isFrozen,
                       onTap: () async {
                         if (_controller == null ||
-                            !_controller!.value.isInitialized)
+                            !_controller!.value.isInitialized) {
                           return;
+                        }
                         try {
                           if (_isFrozen) {
                             await _controller!.resumePreview();
@@ -256,7 +261,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
                             style: TextStyle(
                               fontSize: 120,
                               fontWeight: FontWeight.w900,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               shadows: const [
                                 Shadow(
                                   blurRadius: 15,
@@ -325,6 +330,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
                     final files = _selectedImages
                         .map((path) => XFile(path))
                         .toList();
+
                     await Share.shareXFiles(files);
                   }
                 },
@@ -386,7 +392,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
                   setState(() {
                     _zoomLevel = v;
                     _zoomController.value = Matrix4.identity()
-                      ..scale(_zoomLevel);
+                      ..scaleByVector3(Vector3(_zoomLevel, _zoomLevel, 1.0));
                     _controller?.setZoomLevel(v);
                   });
                 },
@@ -416,7 +422,9 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 : [const Color(0xFF2C2C2C), const Color(0xFF000000)],
           ),
           border: Border.all(
-            color: isActive ? Colors.white : Colors.white.withOpacity(0.1),
+            color: isActive
+                ? Colors.white
+                : Colors.white.withValues(alpha: 0.1),
             width: 0.8,
           ),
         ),
@@ -489,7 +497,7 @@ class _MirrorScreenState extends State<MirrorScreen> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 10,
                     spreadRadius: 1,
                   ),

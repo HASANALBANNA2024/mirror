@@ -134,7 +134,7 @@ class MirrorFrameView extends StatelessWidget {
               child: Text(
                 isFullscreen ? "DEFAULT" : "FULLSCREEN",
                 style: TextStyle(
-                  color: Colors.black.withOpacity(1.0),
+                  color: Colors.black.withValues(alpha: 1.0),
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.5,
@@ -156,10 +156,10 @@ class MirrorFrameView extends StatelessWidget {
             end: Alignment.bottomRight,
             stops: const [0.0, 0.3, 0.7, 1.0],
             colors: [
-              Colors.white.withOpacity(0.04),
+              Colors.white.withValues(alpha: 0.04),
               Colors.transparent,
               Colors.transparent,
-              Colors.white.withOpacity(0.03),
+              Colors.white.withValues(alpha: 0.03),
             ],
           ),
         ),
@@ -173,7 +173,7 @@ class MirrorFrameView extends StatelessWidget {
       opacity: showHandIcon ? 1.0 : 0.0,
       child: Icon(
         Icons.touch_app_outlined,
-        color: Colors.white.withOpacity(0.6),
+        color: Colors.white.withValues(alpha: 0.6),
         size: 50,
       ),
     );

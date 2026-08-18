@@ -21,7 +21,7 @@ class AuraMirrorBorder extends StatelessWidget {
         borderRadius: BorderRadius.circular(25),
         border: Border.all(
           // light on to border full white
-          color: isLightOn ? Colors.white : Colors.white.withOpacity(0.3),
+          color: isLightOn ? Colors.white : Colors.white.withValues(alpha: 0.3),
 
           // light border
           width: isLightOn ? 3.0 : 3.0,
@@ -37,7 +37,7 @@ class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.06)
+      ..color = Colors.white.withValues(alpha: 0.06)
       ..strokeWidth = 0.5;
 
     // Vertical Lines

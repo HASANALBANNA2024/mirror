@@ -40,7 +40,7 @@ class MirrorGalleryService {
   }) {
     return Container(
       height: 180,
-      color: Colors.black.withOpacity(0.95),
+      color: Colors.black.withValues(alpha: 0.95),
       child: Column(
         children: [
           Padding(
